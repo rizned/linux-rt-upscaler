@@ -500,57 +500,8 @@ class Pipeline:
         present_time = (time.perf_counter() - present_start) * 1000
         logger.debug(f"Present took {present_time:.2f} ms")
 
-        # Check if swapchain needs recreation
-        if self.swapchain.needs_recreation():
-            if self.swapchain.is_out_of_date():
-                logger.info("Swapchain out-of-date, full pipeline rebuild in progress")
-                self._update_target_window_size()  # ensure target size is current
-                self.recreate_swapchain()
-            elif self.swapchain.is_suboptimal():
-                logger.debug("Swapchain suboptimal, recreating")
-                self.recreate_swapchain()
-
         total_frame_time = (time.perf_counter() - frame_start) * 1000
         logger.debug(f"Total frame processing time: {total_frame_time:.2f} ms")
-
-    def recreate_swapchain(self):
-        """Create a new swapchain when the current one becomes suboptimal."""
-        now = time.time()
-        if now - self.last_recreate_time < 1.0:  # at most once per second
-            return
-
-        self.last_recreate_time = now
-        logger.info("Recreating swapchain")
-
-        new_width = self.overlay.width()
-        new_height = self.overlay.height()
-
-        # If the overlay was resized, update screen texture and compute groups
-        if new_width != self.screen_width or new_height != self.screen_height:
-            logger.info(
-                f"Overlay resized from {self.screen_width}x{self.screen_height} to {new_width}x{new_height}"
-            )
-            self.screen_width = new_width
-            self.screen_height = new_height
-            start = time.perf_counter()
-            self.screen_tex = Texture2D(new_width, new_height, format=R8G8B8A8_UNORM)
-            logger.debug(
-                f"Screen texture recreated in {(time.perf_counter() - start)*1000:.2f} ms"
-            )
-            self.groups_x = (new_width + 15) // 16
-            self.groups_y = (new_height + 15) // 16
-            self._update_content_dimensions()
-
-        # Create a new swapchain (the old one will be garbage‑collected later)
-        start = time.perf_counter()
-        new_swap = Swapchain((self.display_id, self.xid), R8G8B8A8_UNORM, 3)
-        logger.debug(
-            f"Swapchain recreated in {(time.perf_counter() - start)*1000:.2f} ms"
-        )
-        self.swapchain = new_swap
-        self._rebuild_lanczos_compute()
-
-        logger.info("Swapchain recreated")
 
     def _rebuild_lanczos_compute(self):
         """Rebuild the Lanczos compute object when resources change."""
